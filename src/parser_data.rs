@@ -198,11 +198,11 @@ where C: Clone + Default + ToString {
                 if self.can_change_range {
                     if was_ok_reading_range_rewrite.get() == true {
                 
-                        self.reading_range = *dims.get_mut().clone();
+                        self.reading_range = dims.get_mut().clone();
                         self.is_reading_range_defined = true;
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get_mut().clone();
             },
             false => {
             }
@@ -223,7 +223,7 @@ where C: Clone + Default + ToString {
                 if self.can_change_range {
                     if was_ok_reading_range_rewrite.get() == true {
                 
-                        self.reading_range = *dims.get_mut().clone();
+                        self.reading_range = dims.get_mut().clone();
                         self.is_reading_range_defined = true;                    
                     }
                 }
@@ -243,7 +243,7 @@ where C: Clone + Default + ToString {
                 (self.k[row_tag_id].f)( &mut self.cell, InputTagType::OtherTagEnd(info));                                        
                 if self.can_change_range {
                     if was_ok_reading_range_rewrite.get() == true {
-                        self.reading_range = *dims.get_mut().clone();
+                        self.reading_range = dims.get_mut().clone();
                         self.is_reading_range_defined = true;          
                     }          
                 }
@@ -278,7 +278,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get_mut().clone();
             },
             false => {
             }
@@ -294,7 +294,7 @@ where C: Clone + Default + ToString {
                 (self.k[row_tag_id].f)( &mut self.cell, InputTagType::OtherTagText(text.as_ref(), info));                                        
                 if self.can_change_range {
                     if was_ok_reading_range_rewrite.get() == true {                
-                        self.reading_range = *dims.get_mut().clone();
+                        self.reading_range = dims.get_mut().clone();
                         self.is_reading_range_defined = true;      
                     }              
                 }
@@ -328,7 +328,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get_mut().clone();
                 
             },
             false => {
@@ -360,7 +360,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get_mut().clone();
                 
             },
             false => {
@@ -559,7 +559,7 @@ where C: Clone + Default + ToString {
                                                     }
                                                 }
                                             }
-                                            self.drop_row_request = (*drop_it.get_mut()).clone();
+                                            self.drop_row_request = drop_it.get_mut().clone();
                                             
                                         },
                                         false => {
@@ -726,7 +726,7 @@ where C: Clone + Default + ToString {
         k.sort_by(|a,b| a.0.cmp(&b.0));
         for dta in k {
             let d = dta.0 - self.reading_range.column;
-            ve[d] = dta.1.clone();
+            ve[d] = dta.1;
         }
 
         RowValidation::Valid(ve)
