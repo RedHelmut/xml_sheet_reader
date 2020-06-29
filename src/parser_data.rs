@@ -202,7 +202,7 @@ where C: Clone + Default + ToString {
                         self.is_reading_range_defined = true;
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get();
             },
             false => {
             }
@@ -278,7 +278,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = (*drop_it.get_mut()).clone();
+                self.drop_row_request = drop_it.get();
             },
             false => {
             }
