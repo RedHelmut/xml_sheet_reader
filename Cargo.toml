@@ -1,0 +1,10 @@
+[package]
+name = "xml_sheet_reader"
+version = "0.1.0"
+authors = ["RedHelmut <36139876+RedHelmut@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+quick-xml = "0.14.0"
+bitflags = "1.1.0"
+chrono = "0.4.9"

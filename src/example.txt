@@ -1,0 +1,816 @@
+extern crate chrono;
+use std::fmt;
+use std::collections::HashMap;
+use std::io::prelude::*;
+use std::fs::File;
+use std::time::{Duration, Instant};
+pub mod xlsx;
+pub use xlsx::*;
+pub mod promo_json;
+
+use chrono::prelude::*;
+
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+
+#[macro_use]
+extern crate bitflags;
+
+#[derive(Clone)]
+pub struct SharedDataShare {
+    saved_dimensions: Option<String>,
+    col_count: usize,
+    table:TableInfo,
+  
+
+}
+impl SharedDataShare{
+    pub fn new() -> Self {
+        Self {
+            saved_dimensions: None,
+            col_count: 0,
+            table: TableInfo::default(),
+  
+        }
+    }
+    
+}
+
+
+fn get_shared( share_path: &str ) -> Vec<String> {
+    let mut ret:Vec<String> = Vec::new();
+    
+    let b = TagHandler::new(b"sst/si/t",|x: &mut SharedDataShare, tag_type:InputTagType<String>| {
+        match tag_type {
+            InputTagType::Text( value, s, state ) => {
+
+               value.clone_from( &s.to_owned() );
+            },
+            _ => {
+
+            }
+        }
+
+        });        
+    //let afile_name = r##"F:\3M Promo Data\April-June 2019\may unfiltered\xl\sharedStrings.xml"##;
+    let afile_name = share_path;//r##"F:\multiple table excel test\xl\sharedStrings.xml"##;
+    let mut astd:String = String::new();
+    let afile = File::open(afile_name).expect("Err").read_to_string(&mut astd);
+
+    let mut sh: SharedDataShare = SharedDataShare::new();
+    let mut r = xlsx::create_parser::CreateParser::new(astd.as_str(), XmlReadingRange::Defined( "A1:A*"), &mut sh, b"sst/si", Some(b"sst/si/t"), ParserFlags::ROWS_IN_SEQUENTIAL_ORDER_SKIP );
+    let mut cnt = 0;
+    
+    match r {
+        Ok(ref mut v) => {
+            v.add(b);
+          
+
+            for i in v {
+                match i {
+                    RowValidation::Valid( valid_row ) => {
+                        for k in valid_row {
+                            ret.push(k);
+                            //print!("{}, ", k );
+                        }
+                    },
+                    RowValidation::Invalid( in_valid_row ) => {
+                        println!("Error: {}", in_valid_row);
+                    },
+                    _ => {
+
+                    }
+                }
+              
+                //println!("");
+                cnt = cnt + 1;
+            }
+        },
+        Err(e) => {
+            println!("{}",e);
+        }
+    }
+    //println!("{}", cnt);
+    ret
+}
+#[derive(Default,Clone)]
+struct TableInfo {
+    table_dimensions: String,
+    table_name: String,
+}
+impl fmt::Display for TableInfo {
+    fn fmt(&self, f: &mut fmt::Formatter ) -> fmt::Result {
+        write!(f, "Table Name: {}\r\nDimensions: {}", self.table_name, self.table_dimensions)
+    }
+}
+impl fmt::Debug for TableInfo {
+    fn fmt(&self, f: &mut fmt::Formatter ) -> fmt::Result {
+        write!(f, "Table Name: {}\r\nDimensions: {}", self.table_name, self.table_dimensions)
+    }
+}
+
+
+#[derive(Default,Clone)]
+struct Table {
+    table_columns: Vec<String>,
+    table_info: TableInfo,
+}
+impl fmt::Display for Table {
+    fn fmt(&self, f: &mut fmt::Formatter ) -> fmt::Result {
+        write!(f, "Table Info: {}\r\nColumns: {:?}", self.table_info,self.table_columns)
+    }
+}
+impl fmt::Debug for Table {
+    fn fmt(&self, f: &mut fmt::Formatter ) -> fmt::Result {
+        write!(f, "Table Info: {}\r\nColumns: {:?}", self.table_info,self.table_columns)
+    }
+}
+
+
+fn get_table( path: &str) -> Table {
+    let b = TagHandler::new(b"table/tableColumns/tableColumn|name|",|x: &mut SharedDataShare, tag_type:InputTagType<String>| {
+        match tag_type {
+            InputTagType::Start( value,  attribs,state_info ) => {
+                if attribs.contains_key("name") {
+                    let s = attribs["name"].clone();
+                  //  cell_info.set_column_value( s.to_owned() );
+                  value.clone_from(&s);
+                }
+                
+            },
+            _ => {
+
+            }
+        }
+
+        });        
+        
+    let z = TagHandler::new(b"table|name,displayName,ref|",|x: &mut SharedDataShare, tag_type:InputTagType<String>| {
+        match tag_type {
+            InputTagType::NonRowStart(  attribs, info ) => {
+                if attribs.contains_key("name") {
+                    let s = attribs["name"].clone();
+                    x.table.table_name = s.to_owned();
+                }
+                if attribs.contains_key("displayName") {
+                    let s = attribs["displayName"].clone();
+                    x.table.table_name = s.to_owned();
+                }
+                if attribs.contains_key("ref") {
+                    let s = attribs["ref"].clone();                    
+                    x.table.table_dimensions = s.to_owned();
+                    info.set_dimensions(s.to_owned());
+                }
+            },
+            _ => {
+
+            }
+        }
+
+        });            
+    let c = TagHandler::new(b"table/tableColumns|count|",|x: &mut SharedDataShare, tag_type:InputTagType<String>| {
+                  
+            match tag_type {
+                InputTagType::Start( value,  attribs, state ) => {
+                    if !state.has_dimenstions() {
+                        if attribs.contains_key("count") {
+                            let s = attribs["count"].clone();
+                            match s.to_owned().parse::<usize>() {
+                                Ok( kk ) => {
+                                    state.drop_row(DropRowRequest::Ignore);
+                                    x.saved_dimensions = Some(format!("A1:A{}",kk + 1));
+                                    state.set_dimensions("ddfds".to_owned());
+                                },
+                                Err(e) => {
+
+                                }
+                            }
+                            
+                        }
+                    }
+                },
+                _ => {
+
+                }
+            }
+        
+            
+        });                
+    //let afile_name = r##"F:\3M Promo Data\April-June 2019\may unfiltered\xl\sharedStrings.xml"##;
+   // let afile_name = r##"F:\3M Promo Data\April-June 2019\may unfiltered\xl\tables\table1.xml"##;
+    let mut astd:String = String::new();
+    let afile = File::open(path).expect("Err").read_to_string(&mut astd);
+    let mut sh: SharedDataShare = SharedDataShare::new();
+    let mut r = xlsx::create_parser::CreateParser::new(astd.as_str(), XmlReadingRange::Defined("A1:A*"), &mut sh, b"table/tableColumns/tableColumn", None, ParserFlags::ROWS_IN_SEQUENTIAL_ORDER_SKIP);
+    let mut cnt = 0;
+    let mut column_table: Vec<String> = Vec::new();
+    
+    match r {
+        Ok(ref mut v) => {
+            v.add(b);
+            v.add(c);
+            v.add(z);
+            for i in v {
+                match i {
+                    RowValidation::Valid( valid_row ) => {
+                        for k in valid_row {
+                            column_table.push(k);
+                            //print!("{}, ", k );
+                        }
+                    },
+                    RowValidation::Invalid( in_valid_row ) => {
+                        println!("Error: {}", in_valid_row);
+                    },
+                    _ => {
+
+                    }
+                }
+              
+                //println!("");
+                cnt = cnt + 1;
+            }
+            
+        },
+        Err(e) => {
+            println!("{}",e);
+        }
+    }
+    //println!("{}", cnt);
+    let mut r_table = Table::default();
+    r_table.table_columns = column_table;
+    r_table.table_info = sh.table;    
+    r_table
+}
+
+#[derive(Clone)]
+pub enum RequirementType<T> {
+    StringExactMatch(String),
+    DateRangeMatch(i64,i64),
+    IsValueGreaterThan( T ),
+    IsValueLessThan( T ),
+    StartsWith( String ),
+    IsOneOfItems( Vec<String> ),
+}
+
+
+pub struct Share {
+    last_col_type_attrib: String,
+    shared_strings: Vec<String>,
+    dimensions: Option<String>,
+    total_qty: i64,
+    total_sales: f64,
+    table_data: Table,
+    pub requirements: HashMap<String,RequirementType<f64> >,
+    pub promo:promo_json::PromoRoot,
+    pub complete_promo: HashMap<String,HashMap<u64,promo_json::PromoRoot>>,
+    pub current_customer_name: String,
+    pub qty_column_index: usize,
+    
+}
+impl Share {
+    pub fn new() -> Self {
+        Self {
+            last_col_type_attrib: String::default(),
+            shared_strings: Vec::new(),
+            dimensions: None,
+            total_qty: 0,
+            total_sales: 0.0,
+            table_data: Table::default(),
+            requirements: HashMap::new(),
+            promo: promo_json::PromoRoot{ promo: Vec::new() },
+            complete_promo: HashMap::new(),
+            current_customer_name: String::new(),
+            qty_column_index: 0,
+
+        }
+    }    
+    
+}
+
+
+#[derive(Default, Clone)]
+pub struct ColumnData {
+    pub value: String,
+    pub saved_attribs: HashMap<String,String>,
+    pub type_of_data: String,
+}
+impl ColumnData {
+    pub fn new( val: String, val_type: HashMap<String,String> ) -> Self {
+        Self {
+            value: val,
+            saved_attribs: val_type,
+            type_of_data: String::new(),
+        }
+    }
+    pub fn add_attrib(&mut self, attrib: String, value: String) {
+        self.saved_attribs.entry(attrib).or_insert(value);
+    }
+    
+}
+
+impl std::fmt::Display for ColumnData {
+    fn fmt(&self, f: &mut fmt::Formatter ) -> fmt::Result {
+        //write!(f, "{}({:?})", self.value, self.saved_attribs)
+        write!(f, "{}", self.value)
+    }
+}
+
+pub fn convert_from_date_to_excel_format_string(date: &str) -> Result<String, Box<dyn std::error::Error>> {
+    use chrono::NaiveDate;
+
+    let ch: NaiveDate = NaiveDate::parse_from_str(date, "%m/%d/%Y")?;    
+    let o_date = NaiveDate::from_ymd(1899,12,30);
+    let d: chrono::Duration = ch - o_date;        
+    Ok( d.num_days().to_string() )
+}
+pub fn convert_from_date_to_excel_format(date: &str) -> Result<i64, Box<dyn std::error::Error>> {
+    use chrono::NaiveDate;
+
+    let ch: NaiveDate = NaiveDate::parse_from_str(date, "%m/%d/%Y")?;    
+    let o_date = NaiveDate::from_ymd(1899,12,30);
+    let d: chrono::Duration = ch - o_date;        
+    Ok( d.num_days() )
+}
+
+pub fn convert_from_xlsx_date_to_formatted_string(xlsx_date: i64) -> String {
+    let beginning = NaiveDate::from_ymd(1899,12,30);
+    let dayz = chrono::Duration::days(xlsx_date);
+    let new_date = beginning + dayz;
+    new_date.format("%m/%d/%Y").to_string()
+}
+
+fn test_requirements( column: Option<String>, value: &mut ColumnData, state: &StateInfo<ColumnData>, x: &Share) -> bool {
+    if let Some(column_name) = column {                        
+        if x.requirements.contains_key(&column_name) {
+            match x.requirements[&column_name] {
+                RequirementType::StringExactMatch( ref match_this ) => {
+                    if match_this != &value.value {
+                        state.drop_row(DropRowRequest::Ignore);
+                    }
+                },
+                RequirementType::DateRangeMatch( ref start, ref end ) => {
+                    match value.value.parse::<i64>() {
+                        Ok( parsed_date_xlsx ) => {
+                            if !(parsed_date_xlsx >= *start && parsed_date_xlsx <= *end) {
+                                state.drop_row(DropRowRequest::Ignore);
+                            }                                        
+                        },
+                        Err(er) => {
+                            let err = 
+                                match state.get_column_name() {
+                                        Some( col ) => {
+                                            format!("{} for column {}", er, col )              
+                                        },
+                                        None => {
+                                            format!("{}", er )                                     
+                                        }
+                                    
+                                };
+                            state.drop_row(DropRowRequest::Error( err ) )
+                        }
+                    }
+                },
+                RequirementType::IsValueGreaterThan( ref g_than_val ) => {
+                    match value.value.parse::<f64>() {
+                        Ok( parsed_date_xlsx ) => {
+                            if !(parsed_date_xlsx > *g_than_val) {
+                                state.drop_row(DropRowRequest::Ignore);
+                            }                                        
+                        },
+                        Err(er) => {
+                            let err =
+                                match state.get_column_name() {
+                                    Some( col ) => {
+                                        format!("{} for column {}", er, col )              
+                                    },
+                                    None => {
+                                        format!("{}", er )                                     
+                                    }                                                
+                                };
+                            state.drop_row(DropRowRequest::Error( err ) )
+                        }
+                    }
+                },
+            RequirementType::IsValueLessThan( ref g_than_val ) => {
+                    match value.value.parse::<f64>() {
+                        Ok( parsed_date_xlsx ) => {
+                            if !(parsed_date_xlsx < *g_than_val) {
+                                state.drop_row(DropRowRequest::Ignore);
+                            }                                        
+                        },
+                        Err( er ) => {
+                            let err = 
+                                match state.get_column_name() {
+                                        Some( col ) => {
+                                            format!("{} for column {}", er, col )              
+                                        },
+                                        None => {
+                                            format!("{}", er )                                     
+                                        }
+                                };
+                            state.drop_row(DropRowRequest::Error( err ) )
+                        }
+                    }
+                },                  
+                RequirementType::StartsWith( ref starts_with ) => {
+                    let chk:String = starts_with.to_uppercase();
+                    if !(value.value.to_uppercase().starts_with(chk.as_str())) {
+                        state.drop_row(DropRowRequest::Ignore);
+                    }
+                
+                },
+                RequirementType::IsOneOfItems( ref items ) => {
+                    if !items.contains(&value.value) {
+                        state.drop_row(DropRowRequest::Ignore);
+                    }                                
+                }                                                     
+            }
+            
+        }
+        
+
+        if state.is_dropping_row() {
+            false
+        }
+        else {
+            true
+        }
+        
+        
+    }
+    else {
+        false
+    }
+}
+
+fn main() {
+
+    let a = TagHandler::new(b"worksheet/sheetData/row",|x: &mut Share, tag_type:InputTagType<ColumnData>| {
+        match tag_type {
+            InputTagType::Start( value,  attribs, state ) => {
+            },
+            InputTagType::End( value,state )  => {
+                let dta:RowValidation<ColumnData> = state.get_row_data().unwrap();
+                match dta {
+                    RowValidation::Valid( valid_row ) => {                   
+                        x.total_qty = x.total_qty + valid_row[x.qty_column_index].value.parse::<i64>().unwrap();
+                    },
+                    _ => {
+
+                    }
+                }
+            },
+            InputTagType::HeaderComplete( r ) => {
+                match r.contains_key("Qty") {
+                    true => {
+                        x.qty_column_index = r["Qty"];
+                    },
+                    false => {
+                        
+                    }
+                }
+               
+                let pew = 2;
+            }
+            InputTagType::Text( value, s,state) => {
+            },
+            _ => {
+
+            }
+        }
+        
+    });
+    let b = TagHandler::new(b"worksheet/sheetData/row/c|t,r|", |x: &mut Share, tag_type:InputTagType<ColumnData>| {
+        
+                   
+        match tag_type {
+            InputTagType::Start( value,  attribs, state) => {
+                
+                let vv = "t".as_bytes();
+                if attribs.contains_key("t") {
+                    match attribs.get("t") {
+                        Some(v) => {
+                            x.last_col_type_attrib = v.to_owned();
+                            value.add_attrib("t".to_owned(), v.to_owned());
+                        },
+                        None => {
+                        }
+                    }                    
+                }
+                else if attribs.contains_key("r") {
+                }  
+
+                
+            },
+            InputTagType::ColumnHeader( value, header_name, attribs, state ) => {
+                if attribs.contains_key("t") {
+                    match attribs["t"].as_ref() {
+                        "s" => {
+
+                            let index = header_name.parse::<usize>();
+                            match index {
+                                Ok( valid_index ) => {
+                                    if valid_index < x.shared_strings.len() {
+                                        *header_name = x.shared_strings[valid_index].clone();
+                                    }
+                                },
+                                Err(er) => {
+                                    let err = 
+                                        match state.get_column_name() {
+                                                Some( col ) => {
+                                                    format!("{} for column {}", er, col )              
+                                                },
+                                                None => {
+                                                    format!("{}", er )                                     
+                                                }                                            
+                                        };
+                                    state.drop_row(DropRowRequest::Error( err ) )                                    
+                                }
+                            }
+                        },
+                        _ => {
+
+                        }
+                    }                  
+                }
+            },
+            InputTagType::End( mut value,state )  => {
+                let column_name = state.get_column_name();
+                if test_requirements( column_name.clone(), &mut value, &state, &x ) {
+                    let unwraped_column_name = column_name.unwrap();
+                    match &x.last_col_type_attrib {
+                        a if a == "s" => {
+                            let index = value.value.parse::<usize>();
+                            match index {
+                                Ok( valid_index ) => {
+                                    if valid_index < x.shared_strings.len() {
+                                        value.value = x.shared_strings[valid_index].clone();
+                                    }
+                                },
+                                Err( er ) => {
+                                    let err = 
+                                        match state.get_column_name() {
+                                            Some( col ) => {
+                                                format!("{} for column {}", er, col )              
+                                            },
+                                            None => {
+                                                format!("{}", er )                                     
+                                            }
+                                        
+                                        };
+                                    state.drop_row(DropRowRequest::Error( err ) )
+                                }
+                            };                    
+                        },
+                        a if a == "str" => {
+                            if unwraped_column_name == "Ship Date" {
+                                if let Ok(valid_parse) = value.value.parse::<i64>() {
+                                    value.value = convert_from_xlsx_date_to_formatted_string( valid_parse );
+                                }
+                            }
+                        },
+                        _ => {
+                        }
+                    };
+
+                }
+            
+            },
+
+            _ => {
+
+            }
+        }
+    
+      
+    });
+    let c = TagHandler::new(b"worksheet/sheetData/row/c/v", |x: &mut Share, tag_type: InputTagType<ColumnData>| {
+        match tag_type {
+            InputTagType::Text( value, s, state) => {
+
+                value.value = s.to_owned();
+                match state.get_column_name() {
+                    Some(name) => {
+                        match name.as_ref() {
+                            "Qty" => {
+                            },
+                            "Sales" => {
+                                x.total_sales = x.total_sales + s.parse::<f64>().unwrap();
+                            }, 
+                            "Ship Date" => {
+                            
+                            },                        
+                            _ => {
+
+                            }
+                        }
+                    },
+                    None => {
+
+                    }
+                }
+                
+            },
+            _ => {
+
+            }
+        }
+    
+    });
+
+   let d = TagHandler::<Share,ColumnData>::new(b"worksheet/dimension|ref|", |x: &mut Share, tag_type:InputTagType<ColumnData>| {
+        match tag_type {
+            InputTagType::NonRowStart( attribs, info ) => {
+                   if info.get_dimensions().is_none() {
+                    if attribs.contains_key("ref") {                 
+                        info.set_dimensions(attribs["ref"].clone());              
+                    
+                    }
+                }
+            },
+            InputTagType::NonRowEnd(info)  => {
+                
+
+            },
+            InputTagType::NonRowText( s, info) => {
+                
+            },
+            _ => {
+
+            }
+        }
+        
+    });    
+/*
+  let e = TagHandler::<Share,ColumnData>::add_non_row(b"worksheet/dimension|ref|", |x: &mut Share, tag_type:OtherTagInputType, dims:&mut Dimensions| {
+        match tag_type {
+            OtherTagInputType::Start(attribs) => {      
+                if !dims.has_dimensions() {
+                    if attribs.contains_key("ref") {                 
+                        dims.set_dimensions(attribs["ref"].clone());              
+                        
+                    }
+                }          
+            },
+            OtherTagInputType::End => {                                
+            },
+            OtherTagInputType::Text( value ) => {
+                
+            },
+            _ => {
+
+            }
+        }
+    
+    });        */
+    //let afile_name = r##"F:\multiple table excel test\xl\worksheets\sheet1.xml"##;
+    //let afile_name = r##"F:\3M Promo Data\April-June 2019\may unfiltered\xl\worksheets\sheet1.xml"##;
+    //let afile_name = r##"F:\public_housing_physical_inspection_scores\xl\worksheets\sheet1.xml"##;
+
+    let mut sh: Share = Share::new();
+    match std::fs::File::open(r##"F:\3M Promo Data\April-June 2019\promo_april2019-june2019.json"##) {
+        Ok( open_file ) => {
+            match serde_json::from_reader(open_file) {
+                Ok( sede_base_file ) => {
+                    let promo:promo_json::PromoRoot = sede_base_file;
+                    sh.promo = promo;
+                },
+                Err( serde_parse_error ) => {
+
+                }
+            }
+        },
+        Err( std_file_open_error ) => {
+        
+        }
+    }
+
+    
+    
+    
+  
+    sh.requirements.entry("VEND".to_owned()).or_insert(RequirementType::StringExactMatch("3M".to_owned()));
+    sh.requirements.entry("Ship Date".to_owned()).or_insert(RequirementType::DateRangeMatch( convert_from_date_to_excel_format("4/01/2019").unwrap(),convert_from_date_to_excel_format("6/30/2019").unwrap()));
+    sh.requirements.entry("Qty".to_owned()).or_insert(RequirementType::IsValueGreaterThan( 0.0 ));
+    sh.requirements.entry("Part Number".to_owned()).or_insert(RequirementType::IsOneOfItems( vec!["31481", "30760", "31370", "30761", "01811", "01810", "31371", "31483", "31374", "31372"].into_iter().map(|x| x.to_owned()).collect::<Vec<String>>() ));
+    //sh.requirements.entry("CUST.NAME".to_owned()).or_insert(RequirementType::StartsWith( "MOU".to_owned() ));
+    
+    
+    let afile_name = r##"F:\3M Promo Data\April-June 2019\UntouchedDetailsLarge\xl\worksheets\sheet1.xml"##;
+    let mut astd:String = String::new();
+    let mut afile = File::open(afile_name).expect("Err").read_to_string(&mut astd);
+    sh.shared_strings = get_shared(r##"F:\3M Promo Data\April-June 2019\UntouchedDetailsLarge\xl\sharedStrings.xml"##);
+    sh.table_data = get_table(r##"F:\3M Promo Data\April-June 2019\UntouchedDetailsLarge\xl\tables\table1.xml"##);
+    let mmm = get_table(r##"F:\3M Promo Data\April-June 2019\UntouchedDetailsLarge\xl\tables\table1.xml"##);
+/*
+    let mut sh: Share = Share::new();
+    let afile_name = r##"F:\multiple table excel test 22\xl\worksheets\sheet1.xml"##;
+    let mut astd:String = String::new();
+    let mut afile = File::open(afile_name).expect("Err").read_to_string(&mut astd);
+    sh.shared_strings = get_shared(r##"F:\multiple table excel test 22\xl\sharedStrings.xml"##);
+    sh.table_data = get_table(r##"F:\multiple table excel test 22\xl\tables\table1.xml"##);
+    let mmm = get_table(r##"F:\multiple table excel test 22\xl\tables\table1.xml"##);
+*/
+    //sh.shared_strings = get_shared(r##"F:\public_housing_physical_inspection_scores\xl\sharedStrings.xml"##);
+  //  sh.table_data = get_table(r##"F:\3M Promo Data\April-June 2019\mmmmm\xl\tables\table1.xml"##);
+    let mut r = xlsx::create_parser::CreateParser::<Share, ColumnData>::new(astd.as_str()
+        ,XmlReadingRange::Defined(mmm.table_info.table_dimensions.as_str())
+        ,&mut sh, b"worksheet/sheetData/row|r|"
+        ,Some(b"worksheet/sheetData/row/c|r|")
+        ,ParserFlags::RETURN_HEADER | ParserFlags::HAS_HEADER | ParserFlags::MODIFY_HEADER | ParserFlags::ROWS_IN_SEQUENTIAL_ORDER_SKIP );
+    let mut cnt = 0;
+
+    let mut hash_cust: HashMap<String,Vec<Vec<ColumnData>>> = HashMap::new();
+    let mut header: HashMap<String,usize> = HashMap::new();
+          
+  
+    let now = Instant::now();
+    match r {
+        Ok(ref mut v) => {
+            
+            v.add_many(vec![a,b,c,d]);
+
+            let (invalid_rows, valid_rows):(Vec<_>,Vec<_>) = v.partition(|x| x.is_invalid());
+            if invalid_rows.len() > 0 {
+                for i in invalid_rows.into_iter().filter_map( RowValidation::get_invalid).collect::<Vec<_>>() {
+                    println!("{}", i.message );
+                }
+            }
+            else {
+                for i in valid_rows {
+                
+
+                    match i {
+                        RowValidation::Valid( valid_row ) => {
+                        //  let zipped = header.clone().into_iter().zip(valid_row);
+                            if header.contains_key("CUST.NAME") {           
+                                let index = header["CUST.NAME"];
+                                hash_cust.entry(valid_row[index].value.clone()).and_modify(|x| x.push(valid_row.clone())).or_insert(vec![valid_row]);
+                            }
+                            /*for (k,v) in hash_cust {
+                                print!("{} ",k );
+                            }*/
+
+                        },
+                        RowValidation::Invalid( in_valid_row ) => {
+                            print!("Error: {}", in_valid_row.message);
+                            println!("");
+                        },
+                        RowValidation::Header(hdr) => {
+                            header = hdr.clone();
+
+                            print!("Header: " );
+                            for k in hdr {
+                                print!("{}, ", k.0 );
+                            }
+                            println!("");
+                        }
+                    }
+
+                
+                    cnt = cnt + 1;
+
+                
+                }
+
+                println!("Total Qty {}\r\nTotal Sales {}",sh.total_qty,sh.total_sales);
+                println!("Duration {}",now.elapsed().as_secs());
+                println!("{}", cnt);
+
+                if header.contains_key("Part Number") && header.contains_key("Ship Date") && header.contains_key("Qty") {           
+                        
+                    for (c,i) in hash_cust {
+                        println!("{} purchased:", c);
+                        for q in i {
+                            //for t in q {
+                            let index = header["Part Number"];
+                            let index2 = header["Ship Date"];
+                            let index3 = header["Qty"];
+                            println!("{} - {} on {}", q[index3], q[index], q[index2]);                    
+                        
+                            //}
+                            //println!("");
+                        }        
+                        println!("");
+                    }
+                }
+            }
+
+
+          
+
+        },
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
+
+    
+  //  println!("{}",sh.get_mut().b);
+    
+    
+//    println!("{}",sh.get_mut().b);
+    
+
+}
