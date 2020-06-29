@@ -193,23 +193,18 @@ where C: Clone + Default + ToString {
                 else {
                     (self.k[row_tag_id].f)( &mut self.cell, InputTagType::ColumnStart(&mut self.col_row_pos_info.current_column_value,hsh, &mut sti));
                 }
-
-                
                 if self.can_change_range {
                     if was_ok_reading_range_rewrite.get() == true {
-                
                         self.reading_range = dims.get();
                         self.is_reading_range_defined = true;
                     }
                 }
-                self.drop_row_request = drop_it.get();
+                self.drop_row_request = drop_it.take();
             },
             false => {
             }
-        }                            
-    
+        }
     }
-
   
     pub fn run_start_user_tag_non_row(&mut self, row_tag_id: &[u8], e: &quick_xml::events::BytesStart<'_>, dims: &mut Cell<radix10::Radix10Rectange>  ) {
         match self.k.contains_key(row_tag_id) {
@@ -278,7 +273,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = drop_it.get();
+                self.drop_row_request = drop_it.take();
             },
             false => {
             }
@@ -328,7 +323,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = drop_it.get_mut().clone();
+                self.drop_row_request = drop_it.take();
                 
             },
             false => {
@@ -360,7 +355,7 @@ where C: Clone + Default + ToString {
                         }
                     }
                 }
-                self.drop_row_request = drop_it.get_mut().clone();
+                self.drop_row_request = drop_it.take();
                 
             },
             false => {
@@ -559,7 +554,7 @@ where C: Clone + Default + ToString {
                                                     }
                                                 }
                                             }
-                                            self.drop_row_request = drop_it.get_mut().clone();
+                                            self.drop_row_request = drop_it.take();
                                             
                                         },
                                         false => {
@@ -726,7 +721,7 @@ where C: Clone + Default + ToString {
         k.sort_by(|a,b| a.0.cmp(&b.0));
         for dta in k {
             let d = dta.0 - self.reading_range.column;
-            ve[d] = dta.1;
+            ve[d] = dta.1.clone();
         }
 
         RowValidation::Valid(ve)
